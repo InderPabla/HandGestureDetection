@@ -130,15 +130,6 @@ public class HandGesture3 extends JFrame implements Runnable, MouseListener{
     		else{
     			pixelRaster[i] = 0xFF000000; //else turn pixel black
     		}
-    		
-    		/*if(color[0]<=80 && color[1]>80 && color[2]<=80 && Math.abs(color[0]-color[2])<=50){
-    			pixelRaster[i] = 0xFF00FF00; //if found turn pixel green
-    		}
-    		else{
-    			pixelRaster[i] = 0xFF000000; //else turn pixel black
-    		}*/
-
-    		
     	}
     	
     	//fill pixelRaster2D with pixelRaster information
