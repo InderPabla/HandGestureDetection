@@ -31,35 +31,16 @@ import com.github.sarxos.webcam.Webcam;
  * Finds objects of lime green color and puts red square around them.
  * @author      Inderpreet Pabla
  */
-public class HandGesture extends JFrame implements Runnable, MouseListener{
+public class HandGestureSized extends JFrame implements Runnable, MouseListener{
 	int width,height;
     Webcam webcam;
     int[] pixelRaster = null;
     BufferedImage initialWebcamImage;
-    
-    String realTimePath = "C:/Users/Pabla/Desktop/ImageAnalysis/Tests/AdvancedCarModel/real_time.png";
-    String rawDataFilename = "raw_data.txt";
-    
-    ServerSocket serverSocket;
-    Socket socket;
+
     String[] gestureTypes = new String[]{"Ack","Fist","Hand","One","Straight", "Palm", "Thumbs", "None"};
-    boolean connected = false;
-    boolean dataCollectionMode = false;
-    int imageNumber= 0;
-    int maxImageNumber = 500;
-    int imageCounter = 0;
-    int resetCount = 1;
-    
-    boolean clicked = false;
-    File rawData;
-    PrintWriter writer;
-    int gestureIndex = 7;
-    
-    int[] count = new int[10];
-    int countIndex = 0;
-    
+
     public static void main(String[] args) throws Exception {
-    	HandGesture gesture = new HandGesture(); //make an image analysis object
+    	HandGestureSized gesture = new HandGestureSized(); //make an image analysis object
         Thread thread = new Thread(gesture); //create thread
         thread.start();//start thread
         
@@ -68,7 +49,7 @@ public class HandGesture extends JFrame implements Runnable, MouseListener{
     /**
      * Initializes webcam, buffered image, 2D pixel raster and sets up window.
      */
-    public HandGesture() {
+    public HandGestureSized() {
     	
     	//get default webcam connected to this computer
         webcam = Webcam.getDefault();
@@ -90,35 +71,7 @@ public class HandGesture extends JFrame implements Runnable, MouseListener{
 		setVisible(true);
 
 		addMouseListener(this);
-		//if not data collection mode start server
-		if(dataCollectionMode == false){
-			try {
-				serverSocket = new ServerSocket(12345);
-				socket = serverSocket.accept();
-				connected = true;
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
-		else{
-			rawData = new File(rawDataFilename);
-			
-			if(!rawData.exists()){
-				try {
-					rawData.createNewFile();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-			
-			try {
-				writer = new PrintWriter(rawData);
-			} catch (FileNotFoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
+		
 		
 		
     }
@@ -250,7 +203,12 @@ public class HandGesture extends JFrame implements Runnable, MouseListener{
     	Rectangle rec = null;
     	
     	if(listOfFoundObjects.size()>0){
-    		if(maxX-minX > 100) {
+	    	minX -=0;
+	    	minY-=0;
+	    	maxX+=0;
+	    	maxY+=0;
+	    	
+	    	if(maxX-minX > 100) {
 	    		
 	    		int diff = (maxX-minX)-100;
 	    		int half = diff/2;
@@ -280,6 +238,7 @@ public class HandGesture extends JFrame implements Runnable, MouseListener{
 	    		minY -= half;
 	    		maxY += half;
 	    	}
+	    	
 	    	
 	    	if(minX<0)
 				minX = 0;
@@ -336,10 +295,7 @@ public class HandGesture extends JFrame implements Runnable, MouseListener{
 			index = 0;
 	    	for(int i = 0;i<height;i++){
 	    		for(int j = 0;j<width;j++,index++){
-	    			pixelRaster[index] = pixelRaster2D[i][j];
-	    			//if(pixelRaster[index] == 0xFFFFFFFF)
-	    				
-	    				//pixelRaster[index] = /*pixelRaster2D[i][j]*/tempRaster[index];
+	    			pixelRaster[index] = /*tempRaster[index]*/pixelRaster2D[i][j];
 	    		}
 	    	}
 			
@@ -356,74 +312,61 @@ public class HandGesture extends JFrame implements Runnable, MouseListener{
         	g.drawImage(crop, (int)0, (int)0, (int)50, (int)50, (int)0, (int)0, crop.getWidth(),
         			crop.getHeight(), null);
         	g.dispose();
-    	}
-    	
-    	
-    	if(rec == null){
-    		Graphics g2 = newImage.getGraphics();
+			
+			
+			
+    		/*BufferedImage resized = null;
+    		float ratio = 1;
+    		float newWidth = 50;
+    		float newHeight = 50;
+    		float dispX = 0;
+    		float dispY = 0;
+    		
+    		System.out.println(rec.width+" "+rec.height);
+    		if(rec.width>rec.height){
+    			ratio = (float)rec.width/50f;
+    			newWidth = 50f;
+    			newHeight = (float)rec.height/ratio;
+    			
+    			dispX =0;
+    			if(newHeight<50f){
+    				dispY = (50f-newHeight)/2f;
+    			}
+    			
+    		}
+    		else{
+    			ratio = (float)rec.height/50f;
+    			newWidth = (float)rec.width/ratio;
+    			newHeight = 50f;
+    			
+    			dispY =0;
+    			if(newWidth<50f){
+    				dispX = (50f-newWidth)/2f;
+    			}
+    		}
+    		
+    		resized = new BufferedImage((int)newWidth, (int)newHeight, BufferedImage.TYPE_INT_ARGB);
+        	Graphics2D g = resized.createGraphics();
+        	g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+        	    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
+        	g.drawImage(crop, (int)0, (int)0, (int)newWidth, (int)newHeight, (int)0, (int)0, crop.getWidth(),
+        			crop.getHeight(), null);
+        	g.dispose();
+    		
+        	
+        	
+
+        	Graphics g2 = newImage.getGraphics();
 
         	g2.setColor(Color.black);
         	g2.fillRect(0,0,50,50);
-        	g2.dispose();
-    		
-    	}
-    	
-    	if(dataCollectionMode==true && clicked==true){
-    		
-    		
-    		if(imageNumber>=maxImageNumber){
-    			clicked =false;
-    			writer.close();
-    		}
-    		else{
-        		if(imageCounter == resetCount){
-        			System.out.println(imageNumber);
-        			int i = 0;
-        			for(;i<gestureIndex;i++){
-        				if(i == gestureTypes.length-1)
-        					writer.print("0");
-        				else
-        					writer.print("0 ");
-        			}
-        			
-        			if(i == gestureTypes.length-1){
-        				writer.print("1");
-        				i++;
-        			}
-        			else{
-        				
-        				writer.print("1 ");
-        				i++;
-        				for(;i<gestureTypes.length;i++){
-	        				if(i == gestureTypes.length-1)
-	        					writer.print("0");
-	        				else
-	        					writer.print("0 ");
-	        			}
-        				
-        			}
-        			
-        			try {
-	             		   
-            		    File outputfile = new File(imageNumber+".png");
-            		    ImageIO.write(newImage, "png", outputfile);
-            		} catch (IOException e) {}
-        			
-        			
-        			imageCounter = 0;
-        			imageNumber++;
-        			
-        			if(imageNumber < maxImageNumber){
-        				writer.print("\n");
-        			}
-        			
-        			
-        			
-        		}
-
-        		
-        		imageCounter++;
-    		}
+        	g2.drawImage(resized, (int)dispX, (int)dispY, null);
+        	g2.dispose();*/
+			
+        	
+        	
+        	
     	}
     	
     	
@@ -431,91 +374,28 @@ public class HandGesture extends JFrame implements Runnable, MouseListener{
     	
     	
     	
-    	if(connected == true){
-    		try {
-      		   
-    		    File outputfile = new File(realTimePath);
-    		    ImageIO.write(newImage, "png", outputfile);
-				
-				DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-
-				out.writeFloat(1.23f);
-				
-                InputStream is = socket.getInputStream();
-                InputStreamReader isr = new InputStreamReader(is);
-                BufferedReader br = new BufferedReader(isr);
-                String number = br.readLine();
-                
-                String[] str = number.split(" ");
-                int highestIndex = -1;
-                int highestValue = -1;
-                for(int i = 0; i<str.length;i++){
-                	try{
-                		int f  = (int)(100f*Float.parseFloat(str[i]));
-                		//System.out.print(f+" ");
-                		
-                		if(f>highestValue){
-                			highestValue = f;
-                			highestIndex = i;
-                		}
-                	}
-                	catch(Exception e){
-                		System.out.println("asdsd");
-                	}
-              
-                }
-                
-                //System.out.print(gestureTypes[highestIndex]+" "+(int)(100f*Float.parseFloat(str[highestIndex]))+"\n");
-                
-                int[] countCheck = new int[8];
-                
-                count[countIndex] = highestIndex;
-                countIndex++;
-                if(countIndex == count.length)
-                	countIndex = 0;
-                
-                for(int i =0;i<count.length;i++){
-                	countCheck[count[i]]++;
-                }
-                
-                int correctIndex = -1;
-                int value = 0;
-                for(int i =0;i<countCheck.length;i++){
-                	if(value<countCheck[i]){
-                		correctIndex= i;
-                		value = countCheck[i];
-                	}
-                }
-                
-                
-                Font myFont = new Font ("Courier New", Font.BOLD, 30);
-                graphic.setFont (myFont);
-                
-                graphic.setColor(Color.white);
-                graphic.fillRect(0, height+51,5000,5000);
-                graphic.setColor(Color.red);
-                graphic.drawString(gestureTypes[correctIndex]+" "+(int)(100f*Float.parseFloat(str[highestIndex])), 10, height+50+50);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		
-    	}
+    	
+    	
+    	
+    	
+    	
+    	
 
     	tempInitialWebcamImage.setRGB(0, 0, width, height, tempRaster, 0, width);
     	
-    	graphic.drawImage(initialWebcamImage, 0, 0, null);
-    	graphic.drawImage(tempInitialWebcamImage, width, 0, null);
+    	graphic.drawImage(initialWebcamImage, 0+50, 0+50, null);
+    	graphic.drawImage(tempInitialWebcamImage, width+50, 0+50, null);
     	
     	graphic.setColor(Color.green);
     	for(int i = 0;i<listOfFoundObjects.size();i++){
     		Rectangle rect = listOfFoundObjects.get(i);
-    		graphic.drawRect(rect.x,rect.y,rect.width,rect.height);
+    		graphic.drawRect(rect.x+50,rect.y+50,rect.width,rect.height);
 		}
 
-    	graphic.drawImage(newImage, 0, height, null);
+    	graphic.drawImage(newImage, 0+50, height+50, null);
     	if(rec!=null){
     		graphic.setColor(Color.red);
-    		graphic.drawRect(rec.x,rec.y,rec.width,rec.height);
+    		graphic.drawRect(rec.x+50,rec.y+50,rec.width,rec.height);
     	}
     	
     	
@@ -557,7 +437,7 @@ public class HandGesture extends JFrame implements Runnable, MouseListener{
 
 	@Override
 	public void mouseClicked(MouseEvent arg0) {
-		clicked = true;
+		
 	}
 
 	@Override
