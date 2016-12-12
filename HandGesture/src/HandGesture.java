@@ -1,10 +1,10 @@
-
+import com.github.sarxos.webcam.Webcam;
 import java.awt.AWTException;
 import java.awt.Color;
-
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Image;
 import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -29,18 +29,24 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Vector;
-
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
-
-import com.github.sarxos.webcam.Webcam;
-
 import java.util.ArrayList;
 /**
  * Finds objects of lime green color and puts red square around them.
  * @author      Inderpreet Pabla
  */
 public class HandGesture extends JFrame implements Runnable, MouseListener, KeyListener{
+	//Data collection mode, chess play mode, or mouse control mode
+	boolean dataCollectionMode = false;
+    boolean mouseControlMode = false;
+    boolean chessControlMode = false;
+    boolean armaControlMode = true;
+    
+    //Server socket for Python to connect to
+    ServerSocket serverSocket;
+    Socket socket;
+    
 	int width,height;
     Webcam webcam;
     int[] pixelRaster = null;
@@ -52,12 +58,9 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
     
     String realTimePath = "C:/Users/Pabla/Desktop/ImageAnalysis/Tests/AdvancedCarModel/real_time.png";
     String rawDataFilename = "raw_data.txt";
-    
-    ServerSocket serverSocket;
-    Socket socket;
-    String[] gestureTypes = new String[]{"Ack","Fist","Hand","One","Straight", "Palm", "Thumbs", "None", "Swing"};
+
+    String[] gestureTypes = new String[]{"Ack","Fist","Hand","One","Straight", "Palm", "Thumbs", "None", "Swing", "Peace"};
     boolean connected = false;
-    boolean dataCollectionMode = false;
     int imageNumber= 0;
     int maxImageNumber = 500;
     int imageCounter = 0;
@@ -85,8 +88,15 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
     int pos2 = 8;
     
     int actionType = 0;
+    int searchDepth = 3;
     Point bottomLeftCorner = null, topRightCorner= null;
     Robot robot;
+    
+    
+    Graphics bufferGraphics; 
+    Image offscreen; 
+    Rectangle boxPosition;
+    
     public static void main(String[] args) throws Exception {
     	HandGesture gesture = new HandGesture(); //make an image analysis object
         Thread thread = new Thread(gesture); //create thread
@@ -112,28 +122,34 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
         pixelRaster = ((DataBufferInt) initialWebcamImage.getRaster().getDataBuffer()).getData();
         
         //window setups
-        setSize((width*3), height+50);
+        setSize(width*3, height*4);
         setTitle("Hand Gesture Detection");
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 		getContentPane().setLayout(null);
 		setVisible(true);
-
+		
 		addMouseListener(this);
 		addKeyListener(this);
+		
+		offscreen = createImage(width*3,height*4);  
+        bufferGraphics = offscreen.getGraphics(); 
+		
 		
 		//if not data collection mode start server
 		if(dataCollectionMode == false){
 			try {
 				robot = new Robot();
-			} catch (AWTException e1) {
+			} 
+			catch (AWTException e1) {
 				e1.printStackTrace();
 			}
+			
 			try {
 				serverSocket = new ServerSocket(12345);
 				socket = serverSocket.accept();
 				connected = true;
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
+			} 
+			catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
@@ -143,33 +159,29 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
 			if(!rawData.exists()){
 				try {
 					rawData.createNewFile();
-				} catch (IOException e) {
+				} 
+				catch (IOException e) {
 					e.printStackTrace();
 				}
 			}
 			
 			try {
 				writer = new PrintWriter(rawData);
-			} catch (FileNotFoundException e) {
-				// TODO Auto-generated catch block
+			} 
+			catch (FileNotFoundException e) {
 				e.printStackTrace();
 			}
 		}
 		
 		
+		
     }
 
-    /**
-     * Finds lime green colored objects that are detected infront of the camera and draws 
-     * red boxes on top of them. It first finds pixels that are in the lime green spectrum,  
-     * followed by counting density of found pixel in a given area. Density of over 40 units
-     * is then added to a vector of rectangles and each pixel is checked if it's contained 
-     * within the previously found rectangles. If it's not then a new rectangle is added to 
-     * the location of the new pixel.   
-     * @param g		used to draw buffered image along with red rectangles to the screen.
-     */
+
     public void paint(Graphics graphic) {
+    	
     	initialWebcamImage = webcam.getImage(); //get image
+    	
     	BufferedImage tempInitialWebcamImage = new BufferedImage(width,height,BufferedImage.TYPE_INT_ARGB); 
     	
     	//initilize rasters 
@@ -180,11 +192,10 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
     	int[][] tempRaster2D = new int [height][width];
     	int[][] densityRaster = new int [height][width]; //raster for density
     	int[][] clusterRaster = new int [height][width]; //raster for density
+    	int[] guess = new int[gestureTypes.length];
     	int index = 0; //used to access pixelRaster when running through 2D array
     	
     	//get rasters
-    	
-    	
     	RescaleOp op = new RescaleOp(2f, 0, null);
     	initialWebcamImage = op.filter(initialWebcamImage, initialWebcamImage);
     	initialWebcamImage.getRGB(0, 0, width, height, pixelRaster, 0, width);
@@ -383,8 +394,6 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
 	    	initialWebcamImage.setRGB(0, 0, width, height, pixelRaster, 0, width);
 			BufferedImage crop = cropImage(initialWebcamImage,rec);
 
-			
-			
         	Graphics2D g = newImage.createGraphics();
         	g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
         	    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -464,101 +473,127 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
     	
     	
     	
-    	
-    	
-    	
     	if(connected == true){
-    		try {
-      		   
-    		    File outputfile = new File(realTimePath);
-    		    ImageIO.write(newImage, "png", outputfile);
+    		if(listOfFoundObjects.size()==0){
+    			currentGestureIndex = 7;
+    			guess[7] = 100;
+    		}
+    		else{
+	    		try {
+	      		   
+	    		    File outputfile = new File(realTimePath);
+	    		    ImageIO.write(newImage, "png", outputfile);
+					
+					DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+	
+					out.writeFloat(1.23f);
+					
+	                InputStream is = socket.getInputStream();
+	                InputStreamReader isr = new InputStreamReader(is);
+	                BufferedReader br = new BufferedReader(isr);
+	                String number = br.readLine();
+	                
+	                String[] str = number.split(" ");
+	                
+	                int highestIndex = -1;
+	                int highestValue = -1;
+	                for(int i = 0; i<str.length;i++){
+	                	try{
+	                		int f  = (int)(100f*Float.parseFloat(str[i]));
+	                		guess[i] = f;
+	                		
+	                		//System.out.print(f+" ");
+	                		
+	                		if(f>highestValue){
+	                			highestValue = f;
+	                			highestIndex = i;
+	                		}
+	                	}
+	                	catch(Exception e){
+	                		System.out.println("asdsd");
+	                	}
+	              
+	                }
+	
+	                int[] countCheck = new int[gestureTypes.length];
+	
+	                countQ.add(new Integer[]{highestIndex,highestValue});
+	                if(countQ.size()>searchDepth)
+	                	countQ.remove(0);
+	                
+	                float factor = 1f;
+	                for(int i =countQ.size()-1;i>=0;i--){
+	                	countCheck[countQ.get(i)[0]]+= (float)countQ.get(i)[1]/factor;
+	                	factor *= 1f;
+	                }
+	                
+	                int correctIndex = -1;
+	                int value = 0;
+	                for(int i =0;i<countCheck.length;i++){
+	                	if(value<countCheck[i]){
+	                		correctIndex= i;
+	                		value = countCheck[i];
+	                	}
+	                }
+	                currentGestureIndex = correctIndex;
+	
+	                /*graphic.setColor(Color.white);
+	                graphic.fillRect(0, height+51,5000,5000);
+	                graphic.setColor(Color.red);
+	                graphic.drawString(gestureTypes[correctIndex]+" "+(int)(100f*Float.parseFloat(str[highestIndex])), 10, height+50+50);*/
 				
-				DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-
-				out.writeFloat(1.23f);
-				
-                InputStream is = socket.getInputStream();
-                InputStreamReader isr = new InputStreamReader(is);
-                BufferedReader br = new BufferedReader(isr);
-                String number = br.readLine();
-                
-                String[] str = number.split(" ");
-                int highestIndex = -1;
-                int highestValue = -1;
-                for(int i = 0; i<str.length;i++){
-                	try{
-                		int f  = (int)(100f*Float.parseFloat(str[i]));
-                		//System.out.print(f+" ");
-                		
-                		if(f>highestValue){
-                			highestValue = f;
-                			highestIndex = i;
-                		}
-                	}
-                	catch(Exception e){
-                		System.out.println("asdsd");
-                	}
-              
-                }
-
-                int[] countCheck = new int[9];
-
-                countQ.add(new Integer[]{highestIndex,highestValue});
-                if(countQ.size()>10)
-                	countQ.remove(0);
-                
-                float factor = 1f;
-                for(int i =countQ.size()-1;i>=0;i--){
-                	countCheck[countQ.get(i)[0]]+= (float)countQ.get(i)[1]/factor;
-                	factor *= 1f;
-                }
-                
-                int correctIndex = -1;
-                int value = 0;
-                for(int i =0;i<countCheck.length;i++){
-                	if(value<countCheck[i]){
-                		correctIndex= i;
-                		value = countCheck[i];
-                	}
-                }
-                currentGestureIndex = correctIndex;
-                
-                Font myFont = new Font ("Courier New", Font.BOLD, 30);
-                graphic.setFont (myFont);
-                
-                graphic.setColor(Color.white);
-                graphic.fillRect(0, height+51,5000,5000);
-                graphic.setColor(Color.red);
-                graphic.drawString(gestureTypes[correctIndex]+" "+(int)(100f*Float.parseFloat(str[highestIndex])), 10, height+50+50);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		
+	    		} catch (IOException e) {
+					e.printStackTrace();
+				}
+    		}
     	}
-
+    	
     	
     	//graphic.drawString(boardPos[0][pos1]+""+boardPos[1][pos2], 10, height+50+50+30);
     	
     	tempInitialWebcamImage.setRGB(0, 0, width, height, tempRaster, 0, width);
     	
-    	graphic.drawImage(initialWebcamImage, 0, 0, null);
-    	graphic.drawImage(tempInitialWebcamImage, width, 0, null);
     	
-    	graphic.setColor(Color.green);
+    	bufferGraphics.setColor(Color.white);
+    	bufferGraphics.fillRect(0, 0, 5000, 5000);
+
+    	bufferGraphics.drawImage(initialWebcamImage, 0+20, 0+40, null);
+    	bufferGraphics.drawImage(tempInitialWebcamImage, width+20+10, 0+40, null);
+    	
+    	bufferGraphics.setColor(Color.green);
     	for(int i = 0;i<listOfFoundObjects.size();i++){
     		Rectangle rect = listOfFoundObjects.get(i);
-    		graphic.drawRect(rect.x,rect.y,rect.width,rect.height);
+    		bufferGraphics.drawRect(rect.x+20+width+10,rect.y+40,rect.width,rect.height);
 		}
 
-    	graphic.drawImage(newImage, 0, height, null);
+    	bufferGraphics.drawImage(newImage, 0+20, height+40+10, null);
+    	
+    	bufferGraphics.setColor(Color.red);
     	if(rec!=null){
-    		graphic.setColor(Color.red);
-    		graphic.drawRect(rec.x,rec.y,rec.width,rec.height);
+    		
+    		boxPosition = rec;
+    		bufferGraphics.drawRect(rec.x+20+width+10,rec.y+40,rec.width,rec.height);
+    		
     	}
     	
     	
+    	 Font myFont = new Font ("Courier New", Font.BOLD, 20);
+    	 bufferGraphics.setFont (myFont);
+         
+    	
+    	for(int i =0;i<guess.length;i++){
+    		bufferGraphics.drawString(gestureTypes[i]+": "+guess[i]+"%", 0+20, height+40+10+50+30+i*20);
+    		bufferGraphics.fillRect(175, height+40+10+50+15+i*20, guess[i]+10, 10);
+    	}
+    	
+    	graphic.drawImage(offscreen,0,0,null);
     }
     
+    
+    public void update(Graphics g) 
+    { 
+         System.out.println("aa");
+    } 
     
     private BufferedImage cropImage(BufferedImage src, Rectangle rect) {
         BufferedImage dest = src.getSubimage(rect.x, rect.y, rect.width, rect.height);
@@ -569,15 +604,15 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
 	@Override
 	public void run() {
 		while(true){
-			
+			repaint();
 			try {
 				Thread.sleep(25);
-				repaint();
+				
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}		
 			
-			if(move!=currentGestureIndex && topRightCorner!=null){
+			if(move!=currentGestureIndex && topRightCorner!=null && chessControlMode==true) {
 				move = currentGestureIndex;
 				
 				System.out.println(move);
@@ -632,8 +667,6 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
 				    	else if (pos2 == 8)
 				    		pos2 = 7;
 				    	
-				    	
-				    	
 				    	actionType++;
 				    	
 				    	if(actionType == 2){
@@ -642,8 +675,6 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
 				    		
 				    		int diff = Math.abs(topRightCorner.x-bottomLeftCorner.x);
 				    		int size = diff/8;
-				    		
-				    		
 				    		
 				    		go(oldPos1*size + (size/2) + bottomLeftCorner.x, bottomLeftCorner.y-(oldPos2*size + (size/2)));
 				    		click();
@@ -654,39 +685,190 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
 				}
 				
 			}
+			//Current gestures is not NONE
+			else if(mouseControlMode == true && currentGestureIndex!=7){
+				
+				//Calculate distance from center of the detected hand
+				float distanceFromCenter = (float)Math.sqrt(Math.pow((boxPosition.x+boxPosition.width/2)-width/2f,2f) + Math.pow((boxPosition.y+boxPosition.height/2)-height/2f,2f));  
+				
+				//Current gesture is FIST or ACK, and certain distance away from the center of the 
+				if((distanceFromCenter>20 && currentGestureIndex == 0) || (distanceFromCenter>25 && currentGestureIndex == 1))
+				{
+					//Calculate mouse movement speed depending on distance from the center of the camera
+					float factor = 0;
+					float xSubNorm = ((boxPosition.x+boxPosition.width/2f)-width/2f)/distanceFromCenter;
+					float ySubNorm = ((boxPosition.y+boxPosition.height/2f)-height/2f)/distanceFromCenter;
+					Point p = MouseInfo.getPointerInfo().getLocation();
+					
+					if(currentGestureIndex == 1){
+						factor = 10f;
+					}
+					else if(currentGestureIndex == 0){
+						factor = 2f;
+					}
+					p.x += (xSubNorm*factor);
+					p.y += (ySubNorm*factor);
+					go(p.x, p.y);
+				}
+				//Current gesture is SWING, while the previous gesture was not!
+				else if(move!=currentGestureIndex && currentGestureIndex == 8){
+					move = currentGestureIndex;
+					click();
+					click();
+					System.out.println("Double Click");
+				}
+				//Current gesture is ONE, while the previous gesture was not!
+				else if(move!=currentGestureIndex && currentGestureIndex == 3){
+					move = currentGestureIndex;
+					click();
+					System.out.println("One Click");
+				}
+				else if(move!=currentGestureIndex && currentGestureIndex == 6){
+					move = currentGestureIndex;
+					down();
+					System.out.println("Down");
+				}
+				
+			}
+			else if(armaControlMode == true && currentGestureIndex!=7){
+
+				/*if(currentGestureIndex == 6){
+					//p.x-= 90;
+					robot.keyRelease(KeyEvent.VK_A);
+					robot.keyPress(KeyEvent.VK_D);
+				}
+				else if(currentGestureIndex == 8){
+					//p.x+= 90;wwww
+					robot.keyRelease(KeyEvent.VK_D);
+					robot.keyPress(KeyEvent.VK_A);
+				}
+				else if(currentGestureIndex == 3){
+					robot.keyRelease(KeyEvent.VK_S);
+					robot.keyPress(KeyEvent.VK_W);
+				}
+				else if(currentGestureIndex == 1){
+					robot.keyRelease(KeyEvent.VK_W);
+					robot.keyPress(KeyEvent.VK_S);
+				}
+				else if(currentGestureIndex == 5){
+					robot.keyRelease(KeyEvent.VK_S);
+					robot.keyRelease(KeyEvent.VK_W);
+					robot.keyRelease(KeyEvent.VK_A);
+					robot.keyRelease(KeyEvent.VK_D);
+				}
+				go(p.x,p.y);*/
+				
+				float distanceFromCenterX = (float)Math.sqrt(Math.pow((boxPosition.x+boxPosition.width/2)-width/2f,2f));  
+				float distanceFromCenterY = (float)Math.sqrt(Math.pow((boxPosition.y+boxPosition.height/2)-height/2f,2f));  
+				if((distanceFromCenterX>25 && currentGestureIndex == 1) )
+				{
+					//Calculate mouse movement speed depending on distance from the center of the camera
+					float xSubNorm = ((boxPosition.x+boxPosition.width/2f)-width/2f)/distanceFromCenterX;
+
+					if(xSubNorm<0){
+						robot.keyRelease(KeyEvent.VK_A);
+						robot.keyPress(KeyEvent.VK_D);
+					}
+					else{
+						robot.keyPress(KeyEvent.VK_A);
+						robot.keyRelease(KeyEvent.VK_D);
+					}
+					
+				}
+				else{
+					robot.keyRelease(KeyEvent.VK_A);
+					robot.keyRelease(KeyEvent.VK_D);
+				}
+				
+				if((distanceFromCenterY>20 && currentGestureIndex == 1) )
+				{
+					//Calculate mouse movement speed depending on distance from the center of the camera
+					float ySubNorm = ((boxPosition.y+boxPosition.height/2f)-height/2f)/distanceFromCenterY;
+					if(ySubNorm<0){
+						robot.keyRelease(KeyEvent.VK_S);
+						robot.keyPress(KeyEvent.VK_W);
+					}
+					else{
+						robot.keyPress(KeyEvent.VK_S);
+						robot.keyRelease(KeyEvent.VK_W);
+					}
+					
+				}
+				else{
+					robot.keyRelease(KeyEvent.VK_S);
+					robot.keyRelease(KeyEvent.VK_W);
+				}
+				
+				/*else if(currentGestureIndex == 3){
+					robot.keyRelease(KeyEvent.VK_S);
+					robot.keyPress(KeyEvent.VK_W);
+					robot.keyRelease(KeyEvent.VK_A);
+					robot.keyRelease(KeyEvent.VK_D);
+				}
+				else if(currentGestureIndex == 1){
+					robot.keyRelease(KeyEvent.VK_W);
+					robot.keyPress(KeyEvent.VK_S);
+					robot.keyRelease(KeyEvent.VK_A);
+					robot.keyRelease(KeyEvent.VK_D);
+				}*/
+				if(currentGestureIndex!=1){
+					robot.keyRelease(KeyEvent.VK_S);
+					robot.keyRelease(KeyEvent.VK_W);
+					robot.keyRelease(KeyEvent.VK_A);
+					robot.keyRelease(KeyEvent.VK_D);
+				}
+				
+			}
+			move = currentGestureIndex;
 		}
+		
 		
 	}
 	
-	
+	/**
+	 * Move mouse to the desired location
+	 * @param x
+	 * @param y
+	 */
 	public void go(int x, int y){
 		robot.mouseMove(x, y);
 		try {
 			Thread.sleep(5);
-		} catch (InterruptedException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+		} catch (InterruptedException err) {
+			err.printStackTrace();
 		}
 	}
 	
+	/**
+	 * Do a normal mouse click
+	 */
 	public void click()
 	{
 		robot.mousePress(InputEvent.BUTTON1_MASK);
 		try {
 			Thread.sleep(5);
-		} catch (InterruptedException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+		} catch (InterruptedException err) {
+			err.printStackTrace();
 		}
 		robot.mouseRelease(InputEvent.BUTTON1_MASK);
 		try {
 			Thread.sleep(5);
-		} catch (InterruptedException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+		} catch (InterruptedException err) {
+			err.printStackTrace();
 		}
-		
-		
+	}
+	
+	/**
+	 * Do a mouse down
+	 */
+	public void down()
+	{
+		robot.mousePress(InputEvent.BUTTON1_MASK);
+		try {
+			Thread.sleep(5);
+		} catch (InterruptedException err) {
+			err.printStackTrace();
+		}
 	}
 	
 	
@@ -702,45 +884,15 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
 		return rgb;//return array
 	}
 
+	/*
+	 * Key released event
+	 * @see java.awt.event.KeyListener#keyReleased(java.awt.event.KeyEvent)
+	 */
 	@Override
-	public void mouseClicked(MouseEvent arg0) {
-		clicked = true;	
-	}
-
-	@Override
-	public void mouseEntered(MouseEvent arg0) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void mouseExited(MouseEvent arg0) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void mousePressed(MouseEvent arg0) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void mouseReleased(MouseEvent arg0) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void keyPressed(KeyEvent arg0) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void keyReleased(KeyEvent arg0) {
-		// TODO Auto-generated method stub
+	public void keyReleased(KeyEvent e) {
+		// if not in data collections mode and any key gets pressed
 		if(dataCollectionMode == false){
+			//first get bottom left corner of the board, followed by the top left
 			if(bottomLeftCorner == null){
 				bottomLeftCorner= MouseInfo.getPointerInfo().getLocation();
 				System.out.println(bottomLeftCorner.x+" "+bottomLeftCorner.y);
@@ -752,10 +904,29 @@ public class HandGesture extends JFrame implements Runnable, MouseListener, KeyL
 		}
 	}
 
+	/*
+	 * Mouse clicked event
+	 * @see java.awt.event.MouseListener#mouseClicked(java.awt.event.MouseEvent)
+	 */
 	@Override
-	public void keyTyped(KeyEvent arg0) {
-		// TODO Auto-generated method stub
-		
+	public void mouseClicked(MouseEvent e) {
+		clicked = true;	
 	}
+
+	/**
+	 * Unused implements
+	 * */
+	@Override
+	public void mouseEntered(MouseEvent e) {}
+	@Override
+	public void mouseExited(MouseEvent e) {}
+	@Override
+	public void mousePressed(MouseEvent e) {}
+	@Override
+	public void mouseReleased(MouseEvent e) {}
+	@Override
+	public void keyPressed(KeyEvent e) {}
+	@Override
+	public void keyTyped(KeyEvent e) {}
 
 }
