@@ -7,7 +7,7 @@ class NetLoader:
     
     def __init__(self, model_file = "", weights_file = "", learning_rate = 0.01, 
                  decay_rate = 0.000001, loss_function = "mean_squared_error", 
-                 momentum= 0.9, nesterov=True, train_mode = True, epoch_save = 25, optimizer = "SGD",create_file=False):
+                 momentum= 0.9, nesterov=True, train_mode = True, epoch_save = 25, optimizer = "SGD",create_file=False, copy=False, copy_path = ""):
                      
         self.model_file = model_file
         self.weights_file = weights_file
@@ -27,8 +27,15 @@ class NetLoader:
         self.epoch_save_counter = 0
         self.save_counter = 0
         
+        self.copy_path= copy_path
+        self.copy = copy
+        
         if not model_file == "":
             self.load_model()
+
+            if(not self.copy_path == "") and self.copy==True:
+                self.model.load_weights(self.copy_path)
+                self.model.save_weights(self.weights_file)
 
             if (not weights_file  == "") and os.path.exists(weights_file):
                 self.load_weights()

@@ -327,7 +327,7 @@ def custom_model_hand():
     USER CODE STARTS HERE
     '''
     image_model = Sequential()
-    image_model.add(ZeroPadding2D((2, 2), batch_input_shape=(1, 1, 50, 50)))   
+    image_model.add(ZeroPadding2D((2, 2), batch_input_shape=(1, 3, 50, 50)))   
    
     #54x54 fed in due to zero padding
     image_model.add(Convolution2D(8, 5, 5, activation='relu', name='conv1_1'))
@@ -360,14 +360,11 @@ def custom_model_hand():
     
     image_model.add(Dense(512))
     image_model.add(Activation('tanh'))
-    image_model.add(Dropout(0.25))
+    image_model.add(Dropout(0.2))
     
     image_model.add(Dense(512))
     image_model.add(Activation('tanh'))
-    image_model.add(Dropout(0.25))
-    
-    image_model.add(Dense(512))
-    image_model.add(Activation('tanh'))
+    image_model.add(Dropout(0.1))
     
     image_model.add(Dense(512))
     image_model.add(Activation('tanh'))
@@ -381,20 +378,87 @@ def custom_model_hand():
     image_model.add(Dense(512))
     image_model.add(Activation('tanh'))
     
-    image_model.add(Dense(5))
+    image_model.add(Dense(512))
+    image_model.add(Activation('tanh'))
+    
+    image_model.add(Dense(8))
     image_model.add(Activation('sigmoid'))  
     
     return image_model
     '''
     USER MODE ENDS HERE
     '''
+ 
+def custom_model_hand_2():
+    '''
+    USER CODE STARTS HERE
+    '''
+    image_model = Sequential()
+    image_model.add(ZeroPadding2D((2, 2), batch_input_shape=(1, 1, 50, 50)))   
+   
+    #54x54 fed in due to zero padding
+    image_model.add(Convolution2D(8, 5, 5, activation='relu', name='conv1_1'))
+    image_model.add(ZeroPadding2D((2, 2)))
+    image_model.add(Convolution2D(8, 5, 5, activation='relu', name='conv1_2'))
     
+    image_model.add(MaxPooling2D((2, 2), strides=(2, 2))) #convert 50x50 to 25x25
+        
+    #25x25 fed in
+    image_model.add(ZeroPadding2D((2, 2)))
+    image_model.add(Convolution2D(16, 5, 5, activation='relu', name='conv2_1'))
+    image_model.add(ZeroPadding2D((2, 2)))
+    image_model.add(Convolution2D(16, 5, 5, activation='relu', name='conv2_2'))
+    
+    image_model.add(MaxPooling2D((5, 5), strides=(5, 5))) #convert 25x25 to 5x5
+    
+    #5x5 fed in
+    image_model.add(ZeroPadding2D((2, 2)))
+    image_model.add(Convolution2D(40, 5, 5, activation='relu', name='conv3_1'))
+    image_model.add(ZeroPadding2D((2, 2)))
+    image_model.add(Convolution2D(32, 5, 5, activation='relu', name='conv3_2'))
+    
+    image_model.add(Dropout(0.2))
+    
+    image_model.add(Flatten())
+
+    image_model.add(Dense(512))
+    image_model.add(Activation('tanh'))
+    image_model.add(Dropout(0.2))
+    
+    image_model.add(Dense(512))
+    image_model.add(Activation('tanh'))
+    image_model.add(Dropout(0.15))
+    
+    image_model.add(Dense(512))
+    image_model.add(Activation('tanh'))
+    image_model.add(Dropout(0.1))
+    
+    image_model.add(Dense(512))
+    image_model.add(Activation('tanh'))
+    
+    image_model.add(Dense(512))
+    image_model.add(Activation('tanh'))
+    
+    image_model.add(Dense(512))
+    image_model.add(Activation('tanh'))
+    
+    image_model.add(Dense(512))
+    image_model.add(Activation('tanh'))
+    
+    image_model.add(Dense(512))
+    image_model.add(Activation('tanh'))
+    
+    image_model.add(Dense(10))
+    image_model.add(Activation('sigmoid'))
+
+    return image_model
+   
 def make_model(file):
     print("==================================================") 
     
     print("Creating Model At: ",file) 
     start_time = time.time()
-    model = custom_model_hand()    
+    model = custom_model_hand_2()    
     
     json_model = model.to_json()
     
@@ -410,7 +474,7 @@ def make_model(file):
 
 if __name__ == "__main__":   
     #make_model("cancer_model.json")
-    make_model("hand_detection_model_2.json")
+    make_model("hand_detection_model_3_visual.json")
     q = np.zeros((1,4));
     q[0][0]= 0
     q[0][1]= 1
