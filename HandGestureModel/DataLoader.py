@@ -1,3 +1,9 @@
+"""
+DataLoader.py
+Load data from a given folder.
+This is used togather with NetLoader to make traning and prediction easier.
+"""
+
 from PIL import Image
 import numpy as np 
 import os.path
@@ -23,6 +29,9 @@ class DataLoader:
         if(len(self.data_paths)>0):
             self.load_all_data()
             
+    '''
+    Load given data paths into the input, output sets
+    '''
     def load_all_data(self, data_paths=[]):
         paths = None
         
@@ -37,6 +46,9 @@ class DataLoader:
             self.input_reals_set.append(in_real)
             self.output_reals_set.append(out_real)
     
+    '''
+    Load all data from a single path 
+    '''
     def load_data(self,path):
         in_image = []
         in_real = []
@@ -89,6 +101,17 @@ class DataLoader:
         
         return in_image,in_real,out_real
     
+    '''
+    Load image from image path.
+    Convert png image to a R, G and B array.
+    If black and white is false, the returned array will have the follow 
+    dimensions 1, 3, 50, 50.
+    1 by 3(R,G,B), R, G and B will have a 2D array of 50 by 50 valuyes
+    
+    If black and white is true, the returned array will have the follow 
+    dimensions 1, 1, 50, 50.
+    1 by 3(R), R will have a 2D array of 50 by 50 vaues
+    '''
     def load_image(self,image_path):
         stream = Image.open(image_path) #open file  in stream
             
@@ -136,21 +159,39 @@ class DataLoader:
                 raw_RGB[0].append(red_row)
          
         return raw_RGB
-         
+     
+    '''
+    Get elements to train from the given index.
+    '''
     def get_set_elements_to_train(self,index):
         return [np.array(self.input_images_set[index]), 
                 np.array(self.input_reals_set[index])], np.array(self.output_reals_set[index])
     
+    '''
+    Get only image elements to train. 
+    This can be used when there are no real inputs
+    '''
     def get_only_image_elements_to_train(self,index):
-        return [np.array(self.input_images_set[index])]
-                
+        return [np.array(self.input_images_set[index])], np.array(self.output_reals_set[index])
+     
+    '''
+    Get inputs from a given index
+    '''      
     def get_set_elements_to_predict(self,index):
         return [np.array(self.input_images_set[index]), 
                 np.array(self.input_reals_set[index])]
-    
+
+    '''
+    Get number of inputs this networ has
+    '''
     def get_set_size(self):
         return len(self.input_images_set) 
 
+    '''
+    This method is very important for traning a robust network. 
+    All the images can be combined and randomly shuffled if random sort is true. 
+    It can help in lowering overfitting drastically. 
+    '''
     def combine_data(self,random_sort = False):
         new_input_images_set = []
         new_input_reals_set = []
@@ -187,6 +228,9 @@ class DataLoader:
             self.input_reals_set = [self.input_reals_set]
             self.output_reals_set = [self.output_reals_set]  
         
+    '''
+    Split data into given pieces 
+    '''
     def split_data(self,splits = 1):     
         self.input_images_set = np.array_split(np.array(self.input_images_set[0]), splits)
         self.input_reals_set = np.array_split(np.array(self.input_reals_set[0]), splits)
